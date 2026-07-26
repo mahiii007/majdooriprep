@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-base-900 text-neutral-200 antialiased;
+  }
+  ::selection {
+    @apply bg-accent/30 text-white;
+  }
+  * {
+    scrollbar-color: theme("colors.base.600") transparent;
+    scrollbar-width: thin;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-lg border border-base-700 bg-base-850 shadow-panel;
+  }
+  .label-mono {
+    @apply font-mono text-[11px] uppercase tracking-widest text-neutral-500;
+  }
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-2.5
+      font-mono text-[13px] font-semibold uppercase tracking-wide text-base-950
+      transition-colors hover:bg-accent-light disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-base-600
+      bg-base-800 px-4 py-2.5 font-mono text-[13px] uppercase tracking-wide text-neutral-300
+      transition-colors hover:border-accent/50 hover:text-accent;
+  }
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-base-900;
+  }
+}
