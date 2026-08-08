@@ -19,3 +19,15 @@ export async function getSessionUserId(): Promise<Types.ObjectId | null> {
   if (!session?.user?.id) return null;
   return new Types.ObjectId(session.user.id);
 }
+
+/** For Server Components: redirects to /signin if unauthenticated, or to /dashboard if the user is not an admin. */
+export async function requireAdmin(): Promise<Types.ObjectId> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    redirect("/signin");
+  }
+  if (session.user.role !== "admin") {
+    redirect("/dashboard");
+  }
+  return new Types.ObjectId(session.user.id);
+}
