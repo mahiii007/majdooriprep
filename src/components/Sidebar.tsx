@@ -10,6 +10,7 @@ import {
   BarChart3,
   Bookmark,
   Terminal,
+  Shield,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -22,8 +23,12 @@ const NAV_ITEMS = [
   { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isAdmin }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+
+  const items = isAdmin
+    ? [...NAV_ITEMS, { href: "/admin", label: "Admin Panel", icon: Shield }]
+    : NAV_ITEMS;
 
   return (
     <aside className="flex h-screen w-[260px] shrink-0 flex-col border-r border-base-700 bg-base-950 px-5 py-6">
@@ -38,7 +43,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname?.startsWith(href + "/");
           return (
             <Link

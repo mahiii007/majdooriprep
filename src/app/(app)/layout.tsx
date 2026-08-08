@@ -16,10 +16,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   await connectDB();
   const { currentStreak, rank } = await getHeaderStats(new Types.ObjectId(session.user.id));
+  const isAdmin = session.user.role === "admin";
 
   return (
     <div className="flex min-h-screen bg-base-900">
-      <Sidebar />
+      <Sidebar isAdmin={isAdmin} />
       <div className="flex min-h-screen flex-1 flex-col">
         <Suspense fallback={<div className="h-[73px] border-b border-base-700 bg-base-900" />}>
           <Topbar
