@@ -80,7 +80,7 @@ export default async function DashboardPage() {
                 <StatusIcon status={q.status} />
                 <span className="text-sm text-neutral-200">{q.title}</span>
                 <span className="ml-auto rounded border border-base-600 bg-base-800 px-2 py-0.5 text-[11px] text-neutral-400">
-                  {q.topic}
+                  {q.categoryLabel}
                 </span>
               </Link>
             ))}

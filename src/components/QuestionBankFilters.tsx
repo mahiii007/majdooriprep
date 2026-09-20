@@ -4,26 +4,47 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import { Shuffle } from "lucide-react";
 import { useTransition } from "react";
+import type { CategoryDefinition } from "@/lib/categories";
+import { formatSubCategoryLabel } from "@/lib/categories";
 
-export function QuestionBankFilters({ topics }: { topics: string[] }) {
+export function QuestionBankFilters({ categories }: { categories: CategoryDefinition[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  const activeTopic = searchParams.get("topic") ?? "All Topics";
+  const activeCategory = searchParams.get("category") ?? "all";
+  const activeSubCategory = searchParams.get("subCategory") ?? "all";
   const activeDifficulty = searchParams.get("difficulty") ?? "";
   const activeStatus = searchParams.get("status") ?? "";
 
-  function updateParam(key: string, value: string) {
+  const selectedCategory = categories.find((c) => c.name === activeCategory);
+  const subCategories = selectedCategory
+    ? Object.keys(selectedCategory.subCategories).sort()
+    : [];
+
+  function updateParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
-    if (!value || value === "All Topics") {
-      params.delete(key);
-    } else {
-      params.set(key, value);
+    for (const [key, value] of Object.entries(updates)) {
+      if (!value || value === "all") {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
     }
     params.delete("page");
     startTransition(() => router.push(`${pathname}?${params.toString()}`));
+  }
+
+  function selectCategory(category: string) {
+    updateParams({
+      category: category === "all" ? null : category,
+      subCategory: null,
+    });
+  }
+
+  function selectSubCategory(subCategory: string) {
+    updateParams({ subCategory: subCategory === "all" ? null : subCategory });
   }
 
   async function pickRandom() {
@@ -35,27 +56,78 @@ export function QuestionBankFilters({ topics }: { topics: string[] }) {
 
   return (
     <div className={clsx("flex flex-col gap-4", isPending && "opacity-70")}>
-      <div className="flex flex-wrap items-center gap-2">
-        {["All Topics", ...topics].map((topic) => (
+      <div>
+        <p className="mb-2 label-mono">Category</p>
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            key={topic}
-            onClick={() => updateParam("topic", topic)}
+            onClick={() => selectCategory("all")}
             className={clsx(
               "focus-ring rounded-full border px-4 py-1.5 font-mono text-[12px] transition-colors",
-              activeTopic === topic
+              activeCategory === "all"
                 ? "border-accent bg-accent text-base-950 font-semibold"
                 : "border-base-600 bg-base-800 text-neutral-300 hover:border-accent/50 hover:text-accent"
             )}
           >
-            {topic}
+            All Categories
           </button>
-        ))}
+          {categories.map((category) => (
+            <button
+              key={category.name}
+              onClick={() => selectCategory(category.name)}
+              className={clsx(
+                "focus-ring rounded-full border px-4 py-1.5 font-mono text-[12px] transition-colors",
+                activeCategory === category.name
+                  ? "border-accent bg-accent text-base-950 font-semibold"
+                  : "border-base-600 bg-base-800 text-neutral-300 hover:border-accent/50 hover:text-accent"
+              )}
+            >
+              {category.label}
+              <span className="ml-1.5 text-[10px] opacity-70">({category.total})</span>
+            </button>
+          ))}
+        </div>
       </div>
+
+      {subCategories.length > 0 && (
+        <div>
+          <p className="mb-2 label-mono">Sub-category</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => selectSubCategory("all")}
+              className={clsx(
+                "focus-ring rounded-full border px-3 py-1 font-mono text-[11px] transition-colors",
+                activeSubCategory === "all"
+                  ? "border-accent/70 bg-accent-muted text-accent"
+                  : "border-base-600 bg-base-850 text-neutral-400 hover:border-accent/40 hover:text-accent"
+              )}
+            >
+              All
+            </button>
+            {subCategories.map((sub) => (
+              <button
+                key={sub}
+                onClick={() => selectSubCategory(sub)}
+                className={clsx(
+                  "focus-ring rounded-full border px-3 py-1 font-mono text-[11px] transition-colors",
+                  activeSubCategory === sub
+                    ? "border-accent/70 bg-accent-muted text-accent"
+                    : "border-base-600 bg-base-850 text-neutral-400 hover:border-accent/40 hover:text-accent"
+                )}
+              >
+                {formatSubCategoryLabel(sub)}
+                <span className="ml-1 opacity-60">
+                  ({selectedCategory?.subCategories[sub] ?? 0})
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <select
           value={activeDifficulty}
-          onChange={(e) => updateParam("difficulty", e.target.value)}
+          onChange={(e) => updateParams({ difficulty: e.target.value || null })}
           className="focus-ring rounded-md border border-base-600 bg-base-800 px-3 py-2 font-mono text-[12px] uppercase tracking-wide text-neutral-300"
         >
           <option value="">Difficulty: All</option>
@@ -66,7 +138,7 @@ export function QuestionBankFilters({ topics }: { topics: string[] }) {
 
         <select
           value={activeStatus}
-          onChange={(e) => updateParam("status", e.target.value)}
+          onChange={(e) => updateParams({ status: e.target.value || null })}
           className="focus-ring rounded-md border border-base-600 bg-base-800 px-3 py-2 font-mono text-[12px] uppercase tracking-wide text-neutral-300"
         >
           <option value="">Status: All</option>

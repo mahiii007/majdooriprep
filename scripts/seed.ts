@@ -1,415 +1,51 @@
 /**
- * Seeds the Question and Article collections with sample content so the app
- * is browsable immediately after setup. Safe to re-run: every document is
- * upserted by its unique `slug`, so running `npm run seed` again after
- * editing this file updates existing rows instead of duplicating them.
- *
- * Does NOT touch User, UserQuestionState, or DailyAssignment — those are
- * per-user runtime data created naturally as people sign in and practice.
+ * Seeds the Question and Article collections from src/app/data/*.json.
+ * Safe to re-run: every document is upserted by its unique `slug`.
  *
  * Usage: npm run seed   (reads MONGODB_URI from .env.local or .env)
  */
 import dotenv from "dotenv";
 import path from "path";
+import fs from "fs";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 dotenv.config();
 
 import mongoose from "mongoose";
-import { Question } from "../src/models/Question";
+import { Question, Difficulty } from "../src/models/Question";
 import { Article } from "../src/models/Article";
 
-type SeedQuestion = {
+type SeedQuestionJson = {
   slug: string;
   title: string;
-  topic: string;
-  tags: string[];
-  difficulty: "EASY" | "MEDIUM" | "HARD";
-  estimateMinutes: number;
   description: string;
+  questionBody: string;
+  solutionBody: string;
+  category: string;
+  subCategory: string;
+  tags: string[];
+  difficulty: string;
+  sourcePath?: string;
+  codeSnippets?: { language: string; code: string }[];
 };
 
-const questions: SeedQuestion[] = [
-  // --- JavaScript ---
-  {
-    slug: "implement-promise-all",
-    title: "Implement Promise.all()",
-    topic: "JavaScript",
-    tags: ["concurrency", "async"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 25,
-    description:
-      "Write a function promiseAll(promises) that behaves like the built-in Promise.all: it resolves with an array of results in input order once every promise settles, and rejects immediately with the first rejection reason it sees. Handle a mix of promises and plain values in the input array.",
-  },
-  {
-    slug: "debounce-and-throttle",
-    title: "Debounce & Throttle",
-    topic: "JavaScript",
-    tags: ["closures", "timers"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 15,
-    description:
-      "Implement both debounce(fn, wait) and throttle(fn, limit) from scratch using closures and timers, with no external libraries. Explain the difference in behavior and give one real UI scenario where each is the right choice.",
-  },
-  {
-    slug: "deep-clone-an-object",
-    title: "Deep Clone an Object",
-    topic: "JavaScript",
-    tags: ["recursion", "objects"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 20,
-    description:
-      "Write deepClone(value) that recursively clones nested objects and arrays without sharing references with the original. Handle circular references without infinite-looping, and note where structuredClone or JSON-based approaches fall short.",
-  },
-  {
-    slug: "implement-array-flat",
-    title: "Implement Array.prototype.flat()",
-    topic: "JavaScript",
-    tags: ["recursion", "arrays"],
-    difficulty: "EASY",
-    estimateMinutes: 15,
-    description:
-      "Implement a flatten(arr, depth = 1) function that mimics Array.prototype.flat, flattening nested arrays up to the given depth. Support Infinity as a depth value to fully flatten arbitrarily nested input.",
-  },
-  {
-    slug: "currying-functions",
-    title: "Currying Functions",
-    topic: "JavaScript",
-    tags: ["closures", "higher-order-functions"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 20,
-    description:
-      "Write a curry(fn) helper that transforms any function into its curried form, supporting both curried(a)(b)(c) and curried(a, b)(c) call styles, invoking the original function once enough arguments have been supplied.",
-  },
-  {
-    slug: "build-an-event-emitter",
-    title: "Build an Event Emitter",
-    topic: "JavaScript",
-    tags: ["pub-sub", "closures"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 25,
-    description:
-      "Implement a small EventEmitter class with on(event, handler), off(event, handler), and emit(event, ...args) methods. Support multiple handlers per event and make sure off() only removes the specific handler passed in.",
-  },
-  {
-    slug: "memoization-utility",
-    title: "Memoization Utility",
-    topic: "JavaScript",
-    tags: ["closures", "caching"],
-    difficulty: "EASY",
-    estimateMinutes: 15,
-    description:
-      "Write memoize(fn) that caches results by argument signature so repeated calls with the same arguments skip recomputation. Discuss how you'd key the cache for functions that take objects or multiple arguments.",
-  },
-  {
-    slug: "polyfill-array-reduce",
-    title: "Polyfill Array.prototype.reduce",
-    topic: "JavaScript",
-    tags: ["prototypes", "arrays"],
-    difficulty: "HARD",
-    estimateMinutes: 30,
-    description:
-      "Implement Array.prototype.myReduce, matching the native reduce's behavior including the optional initialValue argument, correct handling of empty arrays, and the same TypeError native reduce throws when no initial value is given for an empty array.",
-  },
-  {
-    slug: "event-loop-task-ordering",
-    title: "Event Loop Task Ordering",
-    topic: "JavaScript",
-    tags: ["event-loop", "microtasks"],
-    difficulty: "HARD",
-    estimateMinutes: 25,
-    description:
-      "Given a snippet mixing setTimeout, Promise.then, and synchronous code, predict the exact console.log output order. Explain the distinction between the microtask queue and the macrotask (timer) queue and why it produces that order.",
-  },
-  {
-    slug: "closures-and-hoisting-quiz",
-    title: "Closures & Hoisting Quiz",
-    topic: "JavaScript",
-    tags: ["closures", "hoisting"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 15,
-    description:
-      "Walk through several short snippets involving var vs let inside loops, function declarations vs expressions, and the temporal dead zone. For each, predict the output and explain the hoisting/closure mechanics that produce it.",
-  },
+type CategoryJson = {
+  name: string;
+  label: string;
+};
 
-  // --- React ---
-  {
-    slug: "virtual-dom-implementation",
-    title: "Virtual DOM Implementation",
-    topic: "React",
-    tags: ["recursion", "rendering"],
-    difficulty: "HARD",
-    estimateMinutes: 60,
-    description:
-      "Build a minimal virtual DOM: a createElement function producing plain JS objects, a render function that turns them into real DOM nodes, and a diff function that patches only the nodes that changed between two virtual trees.",
-  },
-  {
-    slug: "build-a-usedebounce-hook",
-    title: "Build a useDebounce Hook",
-    topic: "React",
-    tags: ["hooks", "timers"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 20,
-    description:
-      "Write a useDebounce(value, delay) hook that returns a debounced version of a fast-changing value, useful for search-as-you-type inputs. Make sure timers are cleaned up correctly on unmount and on rapid re-renders.",
-  },
-  {
-    slug: "controlled-vs-uncontrolled-inputs",
-    title: "Controlled vs Uncontrolled Inputs",
-    topic: "React",
-    tags: ["forms", "state"],
-    difficulty: "EASY",
-    estimateMinutes: 15,
-    description:
-      "Build the same text input twice: once as a controlled component driven by useState, once as an uncontrolled component using a ref. Explain the tradeoffs and when you'd reach for each in a real form.",
-  },
-  {
-    slug: "implement-usestate-from-scratch",
-    title: "Implement useState From Scratch",
-    topic: "React",
-    tags: ["hooks", "closures"],
-    difficulty: "HARD",
-    estimateMinutes: 35,
-    description:
-      "Implement a simplified useState hook outside of React, backed by a module-level array of hook slots and an index cursor, that supports multiple useState calls per component and triggers a re-render on update.",
-  },
-  {
-    slug: "infinite-scroll-list",
-    title: "Infinite Scroll List",
-    topic: "React",
-    tags: ["performance", "hooks"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 30,
-    description:
-      "Build a list component that loads the next page of items when the user scrolls near the bottom, using an IntersectionObserver rather than a scroll event listener. Avoid duplicate fetches when the observer fires multiple times in a row.",
-  },
-  {
-    slug: "context-api-theme-switcher",
-    title: "Context API Theme Switcher",
-    topic: "React",
-    tags: ["context", "state"],
-    difficulty: "EASY",
-    estimateMinutes: 20,
-    description:
-      "Build a ThemeContext with a provider exposing the current theme and a toggle function, consumed by nested components several levels deep without prop drilling. Persist the selected theme so it survives a refresh.",
-  },
-  {
-    slug: "optimistic-ui-updates",
-    title: "Optimistic UI Updates",
-    topic: "React",
-    tags: ["state", "ux"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 25,
-    description:
-      "Implement a like button that updates its count immediately on click (optimistically), then rolls the UI back and shows an error state if the underlying request fails. Cover the double-click / race-condition edge case.",
-  },
+function loadJson<T>(relativePath: string): T {
+  const filePath = path.resolve(process.cwd(), relativePath);
+  return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
+}
 
-  // --- Data Structures ---
-  {
-    slug: "lru-cache-design",
-    title: "LRU Cache Design",
-    topic: "Data Structures",
-    tags: ["doubly-linked-list", "map"],
-    difficulty: "HARD",
-    estimateMinutes: 45,
-    description:
-      "Design and implement an LRU (Least Recently Used) cache with get(key) and put(key, value) operations, both running in O(1) time. Use a hash map combined with a doubly linked list to track recency without scanning the whole cache.",
-  },
-  {
-    slug: "two-sum",
-    title: "Two Sum",
-    topic: "Data Structures",
-    tags: ["arrays", "hash-map"],
-    difficulty: "EASY",
-    estimateMinutes: 10,
-    description:
-      "Given an array of integers and a target value, return the indices of the two numbers that add up to the target. Aim for a single-pass O(n) solution using a hash map instead of the brute-force O(n^2) nested loop.",
-  },
-  {
-    slug: "trie-implementation",
-    title: "Trie Implementation",
-    topic: "Data Structures",
-    tags: ["prefix-tree", "strings"],
-    difficulty: "HARD",
-    estimateMinutes: 35,
-    description:
-      "Implement a Trie (prefix tree) supporting insert(word), search(word), and startsWith(prefix). Discuss the time complexity of each operation relative to word length and how a Trie beats a plain hash set for prefix queries.",
-  },
-  {
-    slug: "binary-search-tree-traversal",
-    title: "Binary Search Tree Traversal",
-    topic: "Data Structures",
-    tags: ["trees", "recursion"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 20,
-    description:
-      "Implement in-order, pre-order, and post-order traversals of a binary search tree, both recursively and iteratively using an explicit stack. Explain which traversal yields sorted output for a BST and why.",
-  },
-  {
-    slug: "min-stack",
-    title: "Min Stack",
-    topic: "Data Structures",
-    tags: ["stacks", "design"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 20,
-    description:
-      "Design a stack that supports push, pop, top, and retrieving the minimum element, all in O(1) time. A naive scan-for-minimum approach is O(n) — find a way to track the running minimum alongside each pushed value.",
-  },
-  {
-    slug: "detect-cycle-in-linked-list",
-    title: "Detect Cycle in Linked List",
-    topic: "Data Structures",
-    tags: ["linked-list", "two-pointers"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 15,
-    description:
-      "Given the head of a singly linked list, determine whether it contains a cycle using O(1) extra space. Implement Floyd's tortoise-and-hare two-pointer technique and explain why the pointers are guaranteed to meet.",
-  },
-  {
-    slug: "queue-with-two-stacks",
-    title: "Implement a Queue with Two Stacks",
-    topic: "Data Structures",
-    tags: ["stacks", "queues"],
-    difficulty: "EASY",
-    estimateMinutes: 15,
-    description:
-      "Implement a FIFO queue using only two LIFO stacks as the underlying storage. Support enqueue and dequeue, and analyze the amortized time complexity across a sequence of operations.",
-  },
-  {
-    slug: "union-find-disjoint-set",
-    title: "Union-Find (Disjoint Set)",
-    topic: "Data Structures",
-    tags: ["graphs", "union-find"],
-    difficulty: "HARD",
-    estimateMinutes: 35,
-    description:
-      "Implement a Union-Find data structure with union(a, b) and find(a) operations, using both path compression and union by rank/size. Use it to detect whether adding an edge to a graph would create a cycle.",
-  },
-
-  // --- System Design ---
-  {
-    slug: "design-a-rate-limiter",
-    title: "Design a Rate Limiter",
-    topic: "System Design",
-    tags: ["rate-limiting", "scalability"],
-    difficulty: "HARD",
-    estimateMinutes: 45,
-    description:
-      "Design a rate limiter that caps each client to N requests per time window across a distributed set of API servers. Compare token bucket, sliding window log, and sliding window counter approaches, and where you'd store the counters.",
-  },
-  {
-    slug: "design-a-url-shortener",
-    title: "Design a URL Shortener",
-    topic: "System Design",
-    tags: ["hashing", "databases"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 35,
-    description:
-      "Design a service like bit.ly: generating short codes for long URLs, redirecting on lookup, and handling collisions. Cover the read/write ratio, caching strategy, and how you'd shard the mapping table at scale.",
-  },
-  {
-    slug: "design-a-typeahead-search",
-    title: "Design a Typeahead Search",
-    topic: "System Design",
-    tags: ["debouncing", "caching"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 30,
-    description:
-      "Design the search-as-you-type suggestions feature for a search bar: client-side debouncing, request cancellation for stale queries, and a backend index (e.g. a trie or prefix-based store) that returns ranked suggestions quickly.",
-  },
-  {
-    slug: "design-a-notification-system",
-    title: "Design a Notification System",
-    topic: "System Design",
-    tags: ["queues", "scalability"],
-    difficulty: "HARD",
-    estimateMinutes: 40,
-    description:
-      "Design a system that fans a single event out to push, email, and in-app notifications for millions of users. Cover the message queue between producers and channel workers, retry/backoff for failed deliveries, and de-duplication.",
-  },
-  {
-    slug: "design-a-news-feed",
-    title: "Design a News Feed",
-    topic: "System Design",
-    tags: ["pagination", "caching"],
-    difficulty: "HARD",
-    estimateMinutes: 45,
-    description:
-      "Design a social feed showing posts from people a user follows, ranked and paginated. Compare fan-out-on-write versus fan-out-on-read, and discuss how you'd handle a celebrity account with millions of followers.",
-  },
-  {
-    slug: "design-a-chat-application",
-    title: "Design a Chat Application",
-    topic: "System Design",
-    tags: ["websockets", "scalability"],
-    difficulty: "HARD",
-    estimateMinutes: 40,
-    description:
-      "Design the backend for a real-time 1:1 and group chat app: connection management over WebSockets, message ordering and delivery guarantees, offline message storage, and read-receipt tracking.",
-  },
-
-  // --- CSS Architecture ---
-  {
-    slug: "css-grid-layout-challenge",
-    title: "CSS Grid Layout Challenge",
-    topic: "CSS Architecture",
-    tags: ["layouts", "responsiveness"],
-    difficulty: "EASY",
-    estimateMinutes: 20,
-    description:
-      "Recreate a responsive card-grid layout using CSS Grid: a fixed sidebar, a fluid main content area with auto-fitting cards, and a footer, all with no fixed pixel widths on the content columns. Use grid-template-areas for the overall page shape.",
-  },
-  {
-    slug: "flexbox-holy-grail-layout",
-    title: "Flexbox Holy Grail Layout",
-    topic: "CSS Architecture",
-    tags: ["flexbox", "layouts"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 20,
-    description:
-      "Build the classic 'holy grail' layout — header, footer, and three columns (nav, main, aside) — using only Flexbox, with the main content column appearing first in source order for accessibility despite its visual position.",
-  },
-  {
-    slug: "css-specificity-puzzle",
-    title: "CSS Specificity Puzzle",
-    topic: "CSS Architecture",
-    tags: ["specificity", "cascade"],
-    difficulty: "EASY",
-    estimateMinutes: 10,
-    description:
-      "Given a set of conflicting CSS rules using ids, classes, attribute selectors, and !important, determine which rule wins for a given element and explain the specificity calculation that gets you there.",
-  },
-  {
-    slug: "bem-naming-convention",
-    title: "BEM Naming Convention",
-    topic: "CSS Architecture",
-    tags: ["bem", "naming"],
-    difficulty: "EASY",
-    estimateMinutes: 10,
-    description:
-      "Refactor a small component's loosely-named CSS classes into BEM (Block__Element--Modifier) naming. Explain what problem BEM is solving and a scenario where it breaks down on a large codebase.",
-  },
-  {
-    slug: "css-custom-properties-theming",
-    title: "CSS Custom Properties Theming",
-    topic: "CSS Architecture",
-    tags: ["custom-properties", "theming"],
-    difficulty: "MEDIUM",
-    estimateMinutes: 20,
-    description:
-      "Build a light/dark theme toggle using CSS custom properties (variables) defined at the :root level and overridden on a [data-theme] attribute, without any CSS-in-JS or duplicated stylesheets.",
-  },
-  {
-    slug: "responsive-typography-scale",
-    title: "Responsive Typography Scale",
-    topic: "CSS Architecture",
-    tags: ["typography", "responsiveness"],
-    difficulty: "EASY",
-    estimateMinutes: 15,
-    description:
-      "Build a fluid type scale using clamp() so heading sizes scale smoothly between a mobile minimum and a desktop maximum without discrete media-query breakpoints. Apply it across at least three heading levels.",
-  },
-];
+function normalizeDifficulty(value: string): Difficulty {
+  const upper = value.trim().toUpperCase();
+  if (upper === "EASY" || upper === "MEDIUM" || upper === "HARD") {
+    return upper;
+  }
+  return "MEDIUM";
+}
 
 type SeedArticle = {
   slug: string;
@@ -485,14 +121,36 @@ async function main() {
     process.exit(1);
   }
 
+  const categories = loadJson<CategoryJson[]>("src/app/data/categories.json");
+  const categoryLabels = new Map(categories.map((c) => [c.name, c.label]));
+  const questions = loadJson<SeedQuestionJson[]>("src/app/data/questions.json");
+
   console.log("Connecting to MongoDB...");
   await mongoose.connect(uri);
 
   console.log(`Upserting ${questions.length} questions...`);
   for (const q of questions) {
+    const topic = categoryLabels.get(q.category) ?? q.category;
     await Question.findOneAndUpdate(
       { slug: q.slug },
-      { $set: { ...q, isActive: true } },
+      {
+        $set: {
+          title: q.title,
+          slug: q.slug,
+          topic,
+          category: q.category,
+          subCategory: q.subCategory,
+          tags: q.tags,
+          difficulty: normalizeDifficulty(q.difficulty),
+          description: q.description,
+          questionBody: q.questionBody ?? "",
+          solutionBody: q.solutionBody ?? "",
+          codeSnippets: q.codeSnippets ?? [],
+          sourcePath: q.sourcePath,
+          isActive: true,
+        },
+        $unset: { estimateMinutes: "" },
+      },
       { upsert: true, setDefaultsOnInsert: true }
     );
   }

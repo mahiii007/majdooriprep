@@ -53,12 +53,14 @@ export default async function DailyPage() {
                 <div className="mt-2 flex items-center gap-2">
                   <DifficultyBadge difficulty={q.difficulty} />
                   <span className="rounded border border-base-600 bg-base-800 px-2 py-0.5 text-xs text-neutral-300">
-                    {q.topic}
+                    {q.categoryLabel}
                   </span>
-                  <span className="flex items-center gap-1 font-mono text-[11px] text-neutral-500">
-                    <Clock size={12} />
-                    {q.estimateMinutes} mins
-                  </span>
+                  {q.estimateMinutes != null && (
+                    <span className="flex items-center gap-1 font-mono text-[11px] text-neutral-500">
+                      <Clock size={12} />
+                      {q.estimateMinutes} mins
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

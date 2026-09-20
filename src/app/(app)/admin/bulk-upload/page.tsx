@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { bulkUpsertQuestions, bulkUpsertArticles } from "@/lib/admin-actions";
+import { getCategoryLabel } from "@/lib/categories";
 import { UploadCloud, CheckCircle, AlertTriangle, Play, HelpCircle, Loader2 } from "lucide-react";
 
 // Simple CSV parser supporting escaped commas inside quotes
@@ -119,39 +120,93 @@ export default function BulkUploadPage() {
           const name = item.title || `Item #${index + 1}`;
 
           if (type === "questions") {
-            if (!item.title) itemErrors.push("Missing 'title'");
-            if (!item.topic) itemErrors.push("Missing 'topic'");
-            if (item.difficulty && !["EASY", "MEDIUM", "HARD"].includes(item.difficulty)) {
-              itemErrors.push("Difficulty must be EASY, MEDIUM, or HARD");
-            } else if (!item.difficulty) {
+            const rawTitle = typeof item.title === "string" ? item.title.trim() : "";
+            if (!rawTitle) itemErrors.push("Missing 'title'");
+
+            const rawCat = typeof item.category === "string" ? item.category.trim() : "";
+            const rawTopic = typeof item.topic === "string" ? item.topic.trim() : "";
+            if (!rawCat && !rawTopic) {
+              itemErrors.push("Missing 'category' or 'topic'");
+            }
+
+            const rawDiff = typeof item.difficulty === "string" ? item.difficulty.trim().toUpperCase() : "";
+            if (rawDiff && !["EASY", "MEDIUM", "HARD"].includes(rawDiff)) {
+              itemErrors.push("Difficulty must be EASY, MEDIUM, or HARD (case-insensitive)");
+            } else if (!rawDiff) {
               itemErrors.push("Missing 'difficulty'");
             }
-            if (item.estimateMinutes === undefined || isNaN(Number(item.estimateMinutes))) {
-              itemErrors.push("EstimateMinutes must be a number");
+
+            const rawDesc = typeof item.description === "string" ? item.description.trim() : "";
+            const rawBody = typeof item.questionBody === "string" ? item.questionBody.trim() : "";
+            if (!rawDesc && !rawBody) {
+              itemErrors.push("Either 'description' or 'questionBody' is required");
             }
-            if (!item.description) itemErrors.push("Missing 'description'");
+
+            let mins: number | undefined = undefined;
+            if (item.estimateMinutes !== undefined && item.estimateMinutes !== "" && item.estimateMinutes !== null) {
+              const numMins = Number(item.estimateMinutes);
+              if (isNaN(numMins) || numMins < 0) {
+                itemErrors.push("EstimateMinutes must be a valid positive number if provided");
+              } else {
+                mins = numMins;
+              }
+            }
+
+            const category = rawCat || (rawTopic ? rawTopic.toLowerCase().replace(/\s+/g, "-") : "general");
+            const topic = rawTopic || getCategoryLabel(category);
+            const subCategory = typeof item.subCategory === "string" && item.subCategory.trim() ? item.subCategory.trim() : "miscellaneous";
+            const description = rawDesc || (rawBody ? rawBody.slice(0, 300).trim() : rawTitle);
+            const questionBody = item.questionBody ?? item.description ?? "";
+            const solutionBody = item.solutionBody ?? "";
+            const codeSnippets = Array.isArray(item.codeSnippets)
+              ? item.codeSnippets.map((cs: any) => ({
+                  language: cs.language || "javascript",
+                  code: typeof cs.code === "string" ? cs.code : String(cs),
+                }))
+              : [];
+
+            items.push({
+              ...item,
+              title: rawTitle,
+              slug: typeof item.slug === "string" && item.slug.trim() ? item.slug.trim() : undefined,
+              topic,
+              category,
+              subCategory,
+              tags: Array.isArray(item.tags)
+                ? item.tags.map((t: any) => String(t).trim()).filter(Boolean)
+                : item.tags
+                ? String(item.tags).split(",").map((t: string) => t.trim()).filter(Boolean)
+                : [],
+              difficulty: rawDiff || "MEDIUM",
+              estimateMinutes: mins,
+              description,
+              questionBody,
+              solutionBody,
+              codeSnippets,
+              sourcePath: typeof item.sourcePath === "string" && item.sourcePath.trim() ? item.sourcePath.trim() : undefined,
+              isActive: item.isActive !== false,
+            });
           } else {
             // Articles validation
             if (!item.title) itemErrors.push("Missing 'title'");
             if (!item.excerpt) itemErrors.push("Missing 'excerpt'");
             if (!item.content) itemErrors.push("Missing 'content'");
+
+            items.push({
+              ...item,
+              tags: Array.isArray(item.tags)
+                ? item.tags
+                : item.tags
+                ? String(item.tags).split(",").map((t: string) => t.trim()).filter(Boolean)
+                : [],
+              isActive: item.isActive !== false,
+              status: item.status || "published",
+            });
           }
 
           if (itemErrors.length > 0) {
             errors.push({ index, itemTitle: name, errors: itemErrors });
           }
-
-          items.push({
-            ...item,
-            tags: Array.isArray(item.tags)
-              ? item.tags
-              : item.tags
-              ? String(item.tags).split(",").map((t: string) => t.trim())
-              : [],
-            estimateMinutes: item.estimateMinutes ? Number(item.estimateMinutes) : 15,
-            isActive: item.isActive !== false,
-            status: item.status || "published",
-          });
         });
 
         setParsedItems(items);
@@ -177,28 +232,60 @@ export default function BulkUploadPage() {
           const name = rowData.title || `Row #${index + 2}`;
 
           if (type === "questions") {
-            if (!rowData.title) itemErrors.push("Missing 'title' column");
-            if (!rowData.topic) itemErrors.push("Missing 'topic' column");
-            const diff = (rowData.difficulty || "").toUpperCase();
-            if (diff && !["EASY", "MEDIUM", "HARD"].includes(diff)) {
+            const rawTitle = rowData.title?.trim();
+            if (!rawTitle) itemErrors.push("Missing 'title' column");
+
+            const rawCat = rowData.category?.trim();
+            const rawTopic = rowData.topic?.trim();
+            if (!rawCat && !rawTopic) {
+              itemErrors.push("Missing 'category' or 'topic' column");
+            }
+
+            const rawDiff = (rowData.difficulty || "").trim().toUpperCase();
+            if (rawDiff && !["EASY", "MEDIUM", "HARD"].includes(rawDiff)) {
               itemErrors.push("Difficulty column must be EASY, MEDIUM, or HARD");
-            } else if (!diff) {
+            } else if (!rawDiff) {
               itemErrors.push("Missing 'difficulty' column");
             }
-            const mins = Number(rowData.estimateminutes || rowData.estimate_minutes);
-            if (isNaN(mins) || mins <= 0) {
-              itemErrors.push("EstimateMinutes column must be a positive number");
+
+            const rawDesc = rowData.description?.trim();
+            const rawBody = (rowData.questionbody || rowData.question_body || "").trim();
+            if (!rawDesc && !rawBody) {
+              itemErrors.push("Missing 'description' or 'questionBody' column");
             }
-            if (!rowData.description) itemErrors.push("Missing 'description' column");
+
+            const minsRaw = rowData.estimateminutes || rowData.estimate_minutes;
+            let mins: number | undefined = undefined;
+            if (minsRaw !== undefined && minsRaw !== "") {
+              const numMins = Number(minsRaw);
+              if (isNaN(numMins) || numMins < 0) {
+                itemErrors.push("EstimateMinutes column must be a positive number");
+              } else {
+                mins = numMins;
+              }
+            }
+
+            const category = rawCat || (rawTopic ? rawTopic.toLowerCase().replace(/\s+/g, "-") : "general");
+            const topic = rawTopic || getCategoryLabel(category);
+            const subCategory = (rowData.subcategory || rowData.sub_category || "").trim() || "miscellaneous";
+            const description = rawDesc || (rawBody ? rawBody.slice(0, 300).trim() : rawTitle);
+            const questionBody = rawBody || rawDesc || "";
+            const solutionBody = (rowData.solutionbody || rowData.solution_body || "").trim();
 
             items.push({
-              title: rowData.title,
-              slug: rowData.slug || undefined,
-              topic: rowData.topic,
-              tags: rowData.tags ? rowData.tags.split(",").map(t => t.trim()) : [],
-              difficulty: diff,
-              estimateMinutes: isNaN(mins) ? 15 : mins,
-              description: rowData.description,
+              title: rawTitle,
+              slug: rowData.slug?.trim() || undefined,
+              topic,
+              category,
+              subCategory,
+              tags: rowData.tags ? rowData.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+              difficulty: rawDiff || "MEDIUM",
+              estimateMinutes: mins,
+              description,
+              questionBody,
+              solutionBody,
+              codeSnippets: [],
+              sourcePath: (rowData.sourcepath || rowData.source_path || "").trim() || undefined,
               isActive: rowData.isactive !== "false",
             });
           } else {
@@ -305,27 +392,36 @@ export default function BulkUploadPage() {
   // Pre-cooked template strings
   const questionJSONExample = `[
   {
-    "title": "Build a useLocalStorage hook",
-    "slug": "build-use-local-storage-hook",
-    "topic": "React",
-    "tags": ["hooks", "state", "storage"],
-    "difficulty": "MEDIUM",
-    "estimateMinutes": 20,
-    "description": "Write a useLocalStorage(key, initialValue) hook that stores its value in window.localStorage and synchronizes values across open browser tabs."
+    "slug": "ps-object-s-12-deep-freeze-an-object-for-immutability",
+    "title": "Deep Freeze an Object for Immutability",
+    "category": "problem-solving",
+    "subCategory": "object(s)",
+    "difficulty": "medium",
+    "tags": ["problem-solving", "object-s-", "immutability"],
+    "description": "Implement a deepFreeze function that recursively freezes an object and all nested properties.",
+    "questionBody": "### Problem Statement\\n\\nWrite a function \`deepFreeze(obj)\` that prevents modification of nested objects...",
+    "solutionBody": "### Approach\\n\\nUse recursion across Object.entries and Object.freeze on the way up...",
+    "codeSnippets": [
+      {
+        "language": "javascript",
+        "code": "function deepFreeze(obj) {\\n  for (let [key, val] of Object.entries(obj)) {\\n    if (typeof val === 'object' && val !== null) deepFreeze(val);\\n  }\\n  return Object.freeze(obj);\\n}"
+      }
+    ]
   },
   {
     "title": "Predict Output: Closure variables",
-    "topic": "JavaScript",
+    "category": "problem-solving",
+    "subCategory": "function(s)",
+    "difficulty": "easy",
     "tags": ["closures", "hoisting"],
-    "difficulty": "EASY",
-    "estimateMinutes": 10,
-    "description": "Walk through this closure example and predict what values print. Why does var inside a loop bind to the final index value?"
+    "description": "Walk through this closure example and predict what values print.",
+    "questionBody": "\`\`\`javascript\\nfor (var i = 0; i < 3; i++) {\\n  setTimeout(() => console.log(i), 100);\\n}\\n\`\`\`\\n\\nWhat gets printed and why?"
   }
 ]`;
 
-  const questionCSVExample = `title,slug,topic,tags,difficulty,estimateMinutes,description
-"Build a useLocalStorage hook",build-use-local-storage-hook,React,"hooks,state",MEDIUM,20,"Write a useLocalStorage(key, initialValue) hook that stores its value in window.localStorage..."
-"Predict Output: Closure variables",predict-closure-vars,JavaScript,"closures,hoisting",EASY,10,"Walk through this closure example and predict..."`;
+  const questionCSVExample = `title,slug,category,subCategory,difficulty,tags,description,questionBody,solutionBody
+"Deep Freeze an Object",deep-freeze-an-object,problem-solving,object(s),MEDIUM,"objects,recursion","Implement recursive freeze...","### Problem\\nFreeze nested properties...","### Solution\\nIterate and freeze."
+"Predict Output: Closures",predict-output-closures,problem-solving,function(s),EASY,"closures,hoisting","Closure variable binding...","\`\`\`js\\nfor(var i=0;...)\\n\`\`\`","var is function scoped."`;
 
   const articleJSONExample = `[
   {
@@ -568,20 +664,27 @@ export default function BulkUploadPage() {
                 <table className="w-full text-left font-sans text-xs">
                   <thead className="bg-base-800 text-[10px] label-mono uppercase text-neutral-400">
                     <tr>
-                      <th className="px-4 py-3">Title</th>
-                      <th className="px-4 py-3">Slug</th>
-                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Title & Slug</th>
+                      <th className="px-4 py-3">Category / SubCategory</th>
                       <th className="px-4 py-3">Difficulty</th>
-                      <th className="px-4 py-3">Estimate</th>
+                      <th className="px-4 py-3">Content Attached</th>
                       <th className="px-4 py-3">Tags</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-base-850 bg-base-900 font-mono text-[11px] text-neutral-300">
                     {parsedItems.map((item, idx) => (
                       <tr key={idx} className="hover:bg-base-850">
-                        <td className="px-4 py-2.5 font-sans font-semibold text-white">{item.title || <span className="text-warn italic">Missing</span>}</td>
-                        <td className="px-4 py-2.5 text-neutral-500">{item.slug || <span className="text-neutral-500 italic">auto-generated</span>}</td>
-                        <td className="px-4 py-2.5 text-neutral-400">{item.topic || <span className="text-warn italic">Missing</span>}</td>
+                        <td className="px-4 py-2.5 font-sans font-semibold text-white">
+                          <div>{item.title || <span className="text-warn italic">Missing</span>}</div>
+                          <div className="font-mono text-[10px] text-neutral-500 font-normal">
+                            {item.slug || <span className="italic text-neutral-600">auto-generated</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="text-accent font-semibold">{item.category || item.topic || <span className="text-warn italic">Missing</span>}</span>
+                          <span className="text-neutral-500 mx-1">/</span>
+                          <span className="text-neutral-400">{item.subCategory || "miscellaneous"}</span>
+                        </td>
                         <td className="px-4 py-2.5 font-bold">
                           {["EASY", "MEDIUM", "HARD"].includes(item.difficulty) ? (
                             <span className={item.difficulty === "EASY" ? "text-ok" : item.difficulty === "MEDIUM" ? "text-accent" : "text-warn"}>
@@ -591,8 +694,31 @@ export default function BulkUploadPage() {
                             <span className="text-warn italic">Invalid ({item.difficulty || "none"})</span>
                           )}
                         </td>
-                        <td className="px-4 py-2.5">{item.estimateMinutes}m</td>
-                        <td className="px-4 py-2.5 text-neutral-500">{item.tags.join(", ") || "-"}</td>
+                        <td className="px-4 py-2.5 text-[10px]">
+                          <div className="flex flex-wrap gap-1">
+                            {item.questionBody && (
+                              <span className="rounded bg-base-800 px-1.5 py-0.5 text-neutral-300 border border-base-700">
+                                Body
+                              </span>
+                            )}
+                            {item.solutionBody && (
+                              <span className="rounded bg-ok-muted px-1.5 py-0.5 text-ok border border-ok/30">
+                                Solution
+                              </span>
+                            )}
+                            {item.codeSnippets?.length > 0 && (
+                              <span className="rounded bg-accent-muted px-1.5 py-0.5 text-accent border border-accent/30">
+                                {item.codeSnippets.length} {item.codeSnippets.length === 1 ? "snippet" : "snippets"}
+                              </span>
+                            )}
+                            {item.estimateMinutes && (
+                              <span className="rounded bg-base-800 px-1.5 py-0.5 text-neutral-400 border border-base-700">
+                                {item.estimateMinutes}m
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-neutral-500 max-w-xs truncate">{item.tags.join(", ") || "-"}</td>
                       </tr>
                     ))}
                   </tbody>

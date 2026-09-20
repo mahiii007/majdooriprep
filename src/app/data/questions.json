@@ -1,0 +1,36 @@
+[
+  {
+    "slug": "ps-object-s-deep-freeze-an-object",
+    "title": "Deep Freeze an Object for Immutability",
+    "description": "Implement a deepFreeze function that recursively freezes an object and all nested properties.",
+    "questionBody": "### Problem Statement\n\nImplement a function `deepFreeze(obj)` that recursively freezes an object and all nested objects/arrays to guarantee immutability.\n\n```js\nconst myObject = {\n  property1: 'value1',\n  nestedObject: { property2: 'value2' }\n};\ndeepFreeze(myObject);\nmyObject.nestedObject.property2 = 'new value';\nconsole.log(myObject.nestedObject.property2); // 'value2'\n```",
+    "solutionBody": "### Approach\n\n1. Iterate over the object's entries using `Object.entries(myObject)`.\n2. If a value is of type `'object'` and not null, recursively call `deepFreeze` on it.\n3. Return `Object.freeze(myObject)` after all nested properties are frozen.",
+    "category": "problem-solving",
+    "subCategory": "object(s)",
+    "tags": ["problem-solving", "objects", "immutability"],
+    "difficulty": "medium",
+    "codeSnippets": [
+      {
+        "language": "javascript",
+        "code": "function deepFreeze(myObject) {\n  for (let [key, value] of Object.entries(myObject)) {\n    if (typeof value === 'object' && value !== null) {\n      deepFreeze(value);\n    }\n  }\n  return Object.freeze(myObject);\n}"
+      }
+    ]
+  },
+  {
+    "slug": "polyfills-array-custom-map",
+    "title": "Implement Array.prototype.myMap",
+    "description": "Write a polyfill for Array.prototype.map that reproduces native behavior.",
+    "questionBody": "### Problem Statement\n\nImplement `Array.prototype.myMap(callback, thisArg)` to mirror the behavior of the built-in `Array.prototype.map`.",
+    "solutionBody": "### Approach\n\n1. Throw a `TypeError` if callback is not callable.\n2. Allocate a new result array of equal length.\n3. Iterate over sparse indices using `in` check, invoking callback with `(element, index, array)` and optional `thisArg`.",
+    "category": "polyfills",
+    "subCategory": "array(s)",
+    "tags": ["polyfills", "arrays", "javascript"],
+    "difficulty": "easy",
+    "codeSnippets": [
+      {
+        "language": "javascript",
+        "code": "Array.prototype.myMap = function(callback, thisArg) {\n  if (typeof callback !== 'function') throw new TypeError(callback + ' is not a function');\n  const res = [];\n  for (let i = 0; i < this.length; i++) {\n    if (i in this) {\n      res[i] = callback.call(thisArg, this[i], i, this);\n    }\n  }\n  return res;\n};"
+      }
+    ]
+  }
+]

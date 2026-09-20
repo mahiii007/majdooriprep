@@ -1,0 +1,27 @@
+[
+  {
+    "name": "problem-solving",
+    "label": "Problem Solving",
+    "total": 2,
+    "subCategories": {
+      "object(s)": 1,
+      "string(s)": 1
+    }
+  },
+  {
+    "name": "polyfills",
+    "label": "Polyfills",
+    "total": 1,
+    "subCategories": {
+      "array(s)": 1
+    }
+  },
+  {
+    "name": "machine-coding",
+    "label": "Machine Coding",
+    "total": 1,
+    "subCategories": {
+      "components": 1
+    }
+  }
+]

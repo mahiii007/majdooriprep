@@ -30,17 +30,73 @@ async function verifyAdmin() {
   }
 }
 
-const questionSchema = z.object({
-  id: z.string().optional(),
-  title: z.string().min(1, "Title is required"),
-  slug: z.string().optional(),
-  topic: z.string().min(1, "Topic is required"),
-  tags: z.array(z.string()).default([]),
-  difficulty: z.enum(["EASY", "MEDIUM", "HARD"]),
-  estimateMinutes: z.number().min(1, "Estimate must be at least 1 minute"),
-  description: z.string().min(1, "Description is required"),
-  isActive: z.boolean().default(true),
+import { getCategoryLabel } from "@/lib/categories";
+
+function deriveTopic(category?: string, topic?: string): string {
+  if (topic && topic.trim()) return topic.trim();
+  if (category && category.trim()) {
+    const label = getCategoryLabel(category.trim());
+    if (label && label !== category.trim()) return label;
+    return category
+      .trim()
+      .replace(/[-_]/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return "General";
+}
+
+function deriveCategory(category?: string, topic?: string): string {
+  if (category && category.trim()) return slugify(category.trim());
+  if (topic && topic.trim()) return slugify(topic.trim());
+  return "general";
+}
+
+const codeSnippetSchema = z.object({
+  language: z.string().default("javascript"),
+  code: z.string(),
 });
+
+const questionSchema = z
+  .object({
+    id: z.string().optional(),
+    title: z.string().min(1, "Title is required"),
+    slug: z.string().optional(),
+    topic: z.string().optional(),
+    category: z.string().optional(),
+    subCategory: z.string().optional(),
+    tags: z.array(z.string()).default([]),
+    difficulty: z.preprocess((val) => {
+      if (typeof val === "string") {
+        const u = val.trim().toUpperCase();
+        if (u === "EASY" || u === "MEDIUM" || u === "HARD") return u;
+      }
+      return val;
+    }, z.enum(["EASY", "MEDIUM", "HARD"]).default("MEDIUM")),
+    estimateMinutes: z.preprocess(
+      (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
+      z.number().min(0).optional()
+    ),
+    description: z.string().optional(),
+    questionBody: z.string().optional(),
+    solutionBody: z.string().optional(),
+    codeSnippets: z.array(codeSnippetSchema).optional().default([]),
+    sourcePath: z.string().optional(),
+    isActive: z.boolean().default(true),
+  })
+  .refine(
+    (data) => Boolean((data.category && data.category.trim()) || (data.topic && data.topic.trim())),
+    {
+      message: "Either 'category' or 'topic' is required",
+      path: ["category"],
+    }
+  )
+  .refine(
+    (data) => Boolean((data.description && data.description.trim()) || (data.questionBody && data.questionBody.trim())),
+    {
+      message: "Either 'description' or 'questionBody' is required",
+      path: ["description"],
+    }
+  );
 
 const articleSchema = z.object({
   id: z.string().optional(),
@@ -52,22 +108,53 @@ const articleSchema = z.object({
   status: z.enum(["draft", "published"]).default("published"),
 });
 
-export async function upsertQuestion(rawData: z.infer<typeof questionSchema>) {
-  await verifyAdmin();
-  const data = questionSchema.parse(rawData);
+export type QuestionInput = z.input<typeof questionSchema>;
+export type ArticleInput = z.input<typeof articleSchema>;
 
+function buildQuestionDoc(data: z.infer<typeof questionSchema>) {
   const finalSlug = data.slug && data.slug.trim() ? slugify(data.slug) : slugify(data.title);
+  const category = deriveCategory(data.category, data.topic);
+  const topic = deriveTopic(data.category, data.topic);
+  const subCategory = data.subCategory && data.subCategory.trim() ? data.subCategory.trim() : "miscellaneous";
+  const description =
+    data.description && data.description.trim()
+      ? data.description.trim()
+      : data.questionBody
+      ? data.questionBody.slice(0, 300).trim()
+      : data.title;
+  const questionBody = data.questionBody ?? data.description ?? "";
+  const solutionBody = data.solutionBody ?? "";
+  const codeSnippets = Array.isArray(data.codeSnippets) ? data.codeSnippets : [];
 
-  const doc = {
-    title: data.title,
+  const doc: Record<string, any> = {
+    title: data.title.trim(),
     slug: finalSlug,
-    topic: data.topic,
-    tags: data.tags.map(t => t.trim().toLowerCase()).filter(Boolean),
+    topic,
+    category,
+    subCategory,
+    tags: data.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
     difficulty: data.difficulty,
-    estimateMinutes: data.estimateMinutes,
-    description: data.description,
+    description,
+    questionBody,
+    solutionBody,
+    codeSnippets,
     isActive: data.isActive,
   };
+
+  if (data.sourcePath) {
+    doc.sourcePath = data.sourcePath;
+  }
+  if (data.estimateMinutes != null && !isNaN(data.estimateMinutes)) {
+    doc.estimateMinutes = data.estimateMinutes;
+  }
+
+  return { finalSlug, doc };
+}
+
+export async function upsertQuestion(rawData: QuestionInput) {
+  await verifyAdmin();
+  const data = questionSchema.parse(rawData);
+  const { finalSlug, doc } = buildQuestionDoc(data);
 
   if (data.id) {
     await Question.findByIdAndUpdate(data.id, { $set: doc });
@@ -97,7 +184,7 @@ export async function toggleQuestionActive(id: string, isActive: boolean) {
   }
 }
 
-export async function upsertArticle(rawData: z.infer<typeof articleSchema>) {
+export async function upsertArticle(rawData: ArticleInput) {
   await verifyAdmin();
   const data = articleSchema.parse(rawData);
 
@@ -110,7 +197,7 @@ export async function upsertArticle(rawData: z.infer<typeof articleSchema>) {
     slug: finalSlug,
     excerpt: data.excerpt,
     content: data.content,
-    tags: data.tags.map(t => t.trim()).filter(Boolean),
+    tags: data.tags.map((t: string) => t.trim()).filter(Boolean),
     status: data.status,
   };
 
@@ -143,23 +230,13 @@ export async function upsertArticle(rawData: z.infer<typeof articleSchema>) {
   revalidatePath("/admin/articles");
 }
 
-export async function bulkUpsertQuestions(questionsList: Array<z.infer<typeof questionSchema>>) {
+export async function bulkUpsertQuestions(questionsList: Array<QuestionInput>) {
   await verifyAdmin();
   
   const parsedList = z.array(questionSchema).parse(questionsList);
   
   for (const rawQ of parsedList) {
-    const finalSlug = rawQ.slug && rawQ.slug.trim() ? slugify(rawQ.slug) : slugify(rawQ.title);
-    const doc = {
-      title: rawQ.title,
-      slug: finalSlug,
-      topic: rawQ.topic,
-      tags: rawQ.tags.map(t => t.trim().toLowerCase()).filter(Boolean),
-      difficulty: rawQ.difficulty,
-      estimateMinutes: rawQ.estimateMinutes,
-      description: rawQ.description,
-      isActive: rawQ.isActive ?? true,
-    };
+    const { finalSlug, doc } = buildQuestionDoc(rawQ);
     
     // Upsert by slug (updates existing questions, creates new ones)
     await Question.findOneAndUpdate(
@@ -174,7 +251,7 @@ export async function bulkUpsertQuestions(questionsList: Array<z.infer<typeof qu
   revalidatePath("/admin/questions");
 }
 
-export async function bulkUpsertArticles(articlesList: Array<z.infer<typeof articleSchema>>) {
+export async function bulkUpsertArticles(articlesList: Array<ArticleInput>) {
   await verifyAdmin();
   
   const parsedList = z.array(articleSchema).parse(articlesList);
@@ -187,7 +264,7 @@ export async function bulkUpsertArticles(articlesList: Array<z.infer<typeof arti
       slug: finalSlug,
       excerpt: rawA.excerpt,
       content: rawA.content,
-      tags: rawA.tags.map(t => t.trim()).filter(Boolean),
+      tags: rawA.tags.map((t: string) => t.trim()).filter(Boolean),
       status: rawA.status ?? "published",
       publishedAt: rawA.status === "published" ? new Date() : null,
     };
