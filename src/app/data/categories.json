@@ -2,26 +2,43 @@
   {
     "name": "problem-solving",
     "label": "Problem Solving",
-    "total": 2,
+    "total": 213,
     "subCategories": {
-      "object(s)": 1,
-      "string(s)": 1
+      "function(s)": 45,
+      "object(s)": 21,
+      "string(s)": 35,
+      "array(s)": 58,
+      "miscellaneous": 21,
+      "web": 15,
+      "number(s)": 4,
+      "promise(s)": 13,
+      "design_patterns_problems": 1
     }
   },
   {
     "name": "polyfills",
     "label": "Polyfills",
-    "total": 1,
+    "total": 81,
     "subCategories": {
-      "array(s)": 1
+      "lodash": 22,
+      "array(s)": 25,
+      "function(s)": 4,
+      "web": 3,
+      "timers": 2,
+      "promise(s)": 9,
+      "number(s)": 2,
+      "object(s)": 6,
+      "react": 2,
+      "string(s)": 6
     }
   },
   {
     "name": "machine-coding",
     "label": "Machine Coding",
-    "total": 1,
+    "total": 85,
     "subCategories": {
-      "components": 1
+      "components": 54,
+      "custom-hooks": 31
     }
   }
 ]
