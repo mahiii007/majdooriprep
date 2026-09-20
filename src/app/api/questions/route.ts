@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const result = await listQuestions({
     userId,
-    topic: sp.get("topic") ?? undefined,
+    category: sp.get("category") ?? undefined,
+    subCategory: sp.get("subCategory") ?? undefined,
     difficulty: (sp.get("difficulty") as Difficulty | null) ?? undefined,
     status: (sp.get("status") as QuestionStatus | "attempted" | null) ?? undefined,
     search: sp.get("q") ?? undefined,

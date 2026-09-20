@@ -1,6 +1,6 @@
 import { connectDB } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
-import { listQuestions, listTopics } from "@/lib/questions";
+import { getQuestionCategories, listQuestions } from "@/lib/questions";
 import { QuestionBankFilters } from "@/components/QuestionBankFilters";
 import { QuestionRow } from "@/components/QuestionRow";
 import { Pagination } from "@/components/Pagination";
@@ -16,17 +16,16 @@ export default async function QuestionBankPage({
   await connectDB();
 
   const page = searchParams.page ? Number(searchParams.page) : 1;
-  const [topics, result] = await Promise.all([
-    listTopics(),
-    listQuestions({
-      userId,
-      topic: searchParams.topic,
-      difficulty: searchParams.difficulty as Difficulty | undefined,
-      status: searchParams.status as QuestionStatus | undefined,
-      search: searchParams.q,
-      page,
-    }),
-  ]);
+  const categories = getQuestionCategories();
+  const result = await listQuestions({
+    userId,
+    category: searchParams.category,
+    subCategory: searchParams.subCategory,
+    difficulty: searchParams.difficulty as Difficulty | undefined,
+    status: searchParams.status as QuestionStatus | undefined,
+    search: searchParams.q,
+    page,
+  });
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -41,16 +40,16 @@ export default async function QuestionBankPage({
       </div>
 
       <div className="mb-6">
-        <QuestionBankFilters topics={topics} />
+        <QuestionBankFilters categories={categories} />
       </div>
 
       <div className="panel overflow-hidden">
-        <div className="grid grid-cols-[40px_1fr_160px_110px_90px_40px] gap-4 border-b border-base-700 px-5 py-3 label-mono">
+        <div className="grid grid-cols-[40px_1fr_180px_140px_110px_40px] gap-4 border-b border-base-700 px-5 py-3 label-mono">
           <span>Status</span>
           <span>Title</span>
           <span>Category</span>
+          <span>Sub-category</span>
           <span>Difficulty</span>
-          <span>Estimate</span>
           <span>Action</span>
         </div>
 

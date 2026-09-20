@@ -1,10 +1,28 @@
 import { Types, FilterQuery } from "mongoose";
 import { Question, IQuestion, Difficulty } from "@/models/Question";
 import { UserQuestionState, IUserQuestionState } from "@/models/UserQuestionState";
+import { CATEGORIES, formatSubCategoryLabel, getCategoryLabel } from "@/lib/categories";
 import type { QuestionDTO, QuestionStatus } from "@/types";
 
+type QuestionFields = Pick<
+  IQuestion,
+  | "_id"
+  | "slug"
+  | "title"
+  | "topic"
+  | "category"
+  | "subCategory"
+  | "tags"
+  | "difficulty"
+  | "estimateMinutes"
+  | "description"
+  | "questionBody"
+  | "solutionBody"
+  | "codeSnippets"
+>;
+
 export function toQuestionDTO(
-  q: Pick<IQuestion, "_id" | "slug" | "title" | "topic" | "tags" | "difficulty" | "estimateMinutes" | "description">,
+  q: QuestionFields,
   state?: Pick<IUserQuestionState, "status" | "bookmarked"> | null
 ): QuestionDTO {
   return {
@@ -12,10 +30,17 @@ export function toQuestionDTO(
     slug: q.slug,
     title: q.title,
     topic: q.topic,
+    category: q.category,
+    categoryLabel: getCategoryLabel(q.category),
+    subCategory: q.subCategory,
+    subCategoryLabel: formatSubCategoryLabel(q.subCategory),
     tags: q.tags,
     difficulty: q.difficulty,
     estimateMinutes: q.estimateMinutes,
     description: q.description,
+    questionBody: q.questionBody ?? "",
+    solutionBody: q.solutionBody ?? "",
+    codeSnippets: q.codeSnippets ?? [],
     status: (state?.status as QuestionStatus) ?? "not_started",
     bookmarked: state?.bookmarked ?? false,
   };
@@ -23,7 +48,8 @@ export function toQuestionDTO(
 
 export interface ListQuestionsParams {
   userId: Types.ObjectId;
-  topic?: string;
+  category?: string;
+  subCategory?: string;
   difficulty?: Difficulty;
   status?: QuestionStatus | "attempted";
   search?: string;
@@ -38,27 +64,19 @@ export interface ListQuestionsResult {
   pageSize: number;
 }
 
-/** Distinct topics for the filter pills — computed from the live question
- * bank rather than hardcoded so a newly-seeded topic shows up automatically. */
-export async function listTopics(): Promise<string[]> {
-  const topics = await Question.distinct("topic", { isActive: true });
-  return topics.sort();
-}
-
 export async function listQuestions(params: ListQuestionsParams): Promise<ListQuestionsResult> {
-  const { userId, topic, difficulty, status, search } = params;
+  const { userId, category, subCategory, difficulty, status, search } = params;
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(50, Math.max(1, params.pageSize ?? 20));
 
   const filter: FilterQuery<IQuestion> = { isActive: true };
-  if (topic && topic !== "All Topics") filter.topic = topic;
+  if (category && category !== "all") filter.category = category;
+  if (subCategory && subCategory !== "all") filter.subCategory = subCategory;
   if (difficulty) filter.difficulty = difficulty;
   if (search && search.trim()) {
     filter.$text = { $search: search.trim() };
   }
 
-  // Status filters need the per-user state, so when one is active we first
-  // resolve the matching questionIds from UserQuestionState, then intersect.
   if (status) {
     const statusFilter =
       status === "attempted" ? { $in: ["done", "revision", "in_progress"] } : status;
@@ -72,7 +90,7 @@ export async function listQuestions(params: ListQuestionsParams): Promise<ListQu
   const [total, questions] = await Promise.all([
     Question.countDocuments(filter),
     Question.find(filter)
-      .sort({ createdAt: 1 })
+      .sort({ category: 1, subCategory: 1, title: 1 })
       .skip((page - 1) * pageSize)
       .limit(pageSize)
       .lean<IQuestion[]>(),
@@ -112,7 +130,6 @@ export async function listBookmarkedQuestions(userId: Types.ObjectId): Promise<Q
   }).lean<IQuestion[]>();
   const questionById = new Map(questions.map((q) => [String(q._id), q]));
 
-  // Preserve most-recently-bookmarked-first order from the state query above.
   return states
     .map((s) => {
       const q = questionById.get(String(s.questionId));
@@ -121,9 +138,6 @@ export async function listBookmarkedQuestions(userId: Types.ObjectId): Promise<Q
     .filter((q): q is QuestionDTO => q !== null);
 }
 
-/** Powers the "Pick Random" button — biased toward questions the user
- * hasn't solved yet, falling back to the full active pool if everything's
- * already done. */
 export async function pickRandomQuestionSlug(userId: Types.ObjectId): Promise<string | null> {
   const doneIds = (
     await UserQuestionState.find({ userId, status: "done" }, { questionId: 1 }).lean()
@@ -142,4 +156,8 @@ export async function pickRandomQuestionSlug(userId: Types.ObjectId): Promise<st
     { $project: { slug: 1, _id: 0 } },
   ]);
   return fallback[0]?.slug ?? null;
+}
+
+export function getQuestionCategories() {
+  return CATEGORIES;
 }

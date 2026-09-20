@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { connectDB } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
 import { getQuestionBySlug } from "@/lib/questions";
 import { DifficultyBadge } from "@/components/DifficultyBadge";
 import { QuestionActions } from "@/components/QuestionActions";
+import { QuestionContent } from "@/components/QuestionContent";
 
 export default async function QuestionDetailPage({ params }: { params: { slug: string } }) {
   const userId = await requireUserId();
@@ -15,7 +16,7 @@ export default async function QuestionDetailPage({ params }: { params: { slug: s
   if (!question) notFound();
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <Link
         href="/questions"
         className="mb-6 inline-flex items-center gap-1.5 font-mono text-[12px] uppercase tracking-wide text-neutral-500 transition-colors hover:text-accent"
@@ -27,12 +28,11 @@ export default async function QuestionDetailPage({ params }: { params: { slug: s
       <div className="panel p-8">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <DifficultyBadge difficulty={question.difficulty} />
-          <span className="rounded border border-base-600 bg-base-800 px-2 py-0.5 text-xs text-neutral-300">
-            {question.topic}
+          <span className="rounded border border-accent/30 bg-accent-muted px-2 py-0.5 text-xs text-accent">
+            {question.categoryLabel}
           </span>
-          <span className="flex items-center gap-1 font-mono text-[11px] text-neutral-500">
-            <Clock size={12} />
-            {question.estimateMinutes} mins
+          <span className="rounded border border-base-600 bg-base-800 px-2 py-0.5 text-xs text-neutral-300">
+            {question.subCategoryLabel}
           </span>
         </div>
 
@@ -49,8 +49,13 @@ export default async function QuestionDetailPage({ params }: { params: { slug: s
           ))}
         </div>
 
-        <div className="prose-invert mb-8 whitespace-pre-line text-sm leading-relaxed text-neutral-300">
-          {question.description}
+        <div className="mb-8">
+          <QuestionContent
+            questionBody={question.questionBody}
+            solutionBody={question.solutionBody}
+            description={question.description}
+            codeSnippets={question.codeSnippets}
+          />
         </div>
 
         <div className="border-t border-base-700 pt-6">

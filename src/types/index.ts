@@ -22,15 +22,27 @@ export type QuestionStatus =
   | "revision"
   | "skipped";
 
+export interface CodeSnippetDTO {
+  language: string;
+  code: string;
+}
+
 export interface QuestionDTO {
   id: string;
   slug: string;
   title: string;
   topic: string;
+  category: string;
+  categoryLabel: string;
+  subCategory: string;
+  subCategoryLabel: string;
   tags: string[];
   difficulty: Difficulty;
-  estimateMinutes: number;
+  estimateMinutes?: number;
   description: string;
+  questionBody: string;
+  solutionBody: string;
+  codeSnippets: CodeSnippetDTO[];
   status: QuestionStatus;
   bookmarked: boolean;
 }

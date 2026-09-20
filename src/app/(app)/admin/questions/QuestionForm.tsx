@@ -11,11 +11,15 @@ interface QuestionFormProps {
     id: string;
     slug: string;
     title: string;
-    topic: string;
+    topic?: string;
+    category?: string;
+    subCategory?: string;
     tags: string[];
     difficulty: "EASY" | "MEDIUM" | "HARD";
-    estimateMinutes: number;
+    estimateMinutes?: number;
     description: string;
+    questionBody?: string;
+    solutionBody?: string;
     isActive: boolean;
   };
 }
@@ -27,17 +31,21 @@ export function QuestionForm({ initialData }: QuestionFormProps) {
 
   const [title, setTitle] = useState(initialData?.title || "");
   const [slug, setSlug] = useState(initialData?.slug || "");
+  const [category, setCategory] = useState(initialData?.category || "problem-solving");
+  const [subCategory, setSubCategory] = useState(initialData?.subCategory || "");
   const [topic, setTopic] = useState(initialData?.topic || "");
   const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">(
     initialData?.difficulty || "EASY"
   );
-  const [estimateMinutes, setEstimateMinutes] = useState(
-    initialData?.estimateMinutes || 15
+  const [estimateMinutes, setEstimateMinutes] = useState<number | undefined>(
+    initialData?.estimateMinutes
   );
   const [tagsInput, setTagsInput] = useState(
     initialData?.tags.join(", ") || ""
   );
   const [description, setDescription] = useState(initialData?.description || "");
+  const [questionBody, setQuestionBody] = useState(initialData?.questionBody || "");
+  const [solutionBody, setSolutionBody] = useState(initialData?.solutionBody || "");
   const [isActive, setIsActive] = useState(
     initialData ? initialData.isActive : true
   );
@@ -57,11 +65,15 @@ export function QuestionForm({ initialData }: QuestionFormProps) {
           id: initialData?.id,
           title,
           slug: slug.trim() || undefined,
-          topic,
+          category: category.trim() || undefined,
+          subCategory: subCategory.trim() || "miscellaneous",
+          topic: topic.trim() || undefined,
           tags,
           difficulty,
-          estimateMinutes: Number(estimateMinutes),
-          description,
+          estimateMinutes: estimateMinutes ? Number(estimateMinutes) : undefined,
+          description: description.trim() || (questionBody ? questionBody.slice(0, 300).trim() : title),
+          questionBody,
+          solutionBody,
           isActive,
         });
         router.push("/admin/questions");
@@ -73,7 +85,7 @@ export function QuestionForm({ initialData }: QuestionFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto">
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between pb-4 border-b border-base-800">
         <Link
           href="/admin/questions"
@@ -104,7 +116,7 @@ export function QuestionForm({ initialData }: QuestionFormProps) {
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Implement Array.prototype.map"
+            placeholder="e.g. Deep Freeze an Object for Immutability"
             className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white placeholder-neutral-500 font-sans"
           />
         </div>
@@ -118,27 +130,44 @@ export function QuestionForm({ initialData }: QuestionFormProps) {
             type="text"
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
-            placeholder="e.g. implement-array-map (auto-generated if empty)"
+            placeholder="e.g. ps-object-s-deep-freeze (auto-generated if empty)"
             className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white placeholder-neutral-500 font-mono"
           />
         </div>
 
-        {/* Topic & Difficulty */}
+        {/* Category & SubCategory */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
-              Category/Topic
+              Category Slug
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white font-mono"
+            >
+              <option value="problem-solving">problem-solving (Problem Solving)</option>
+              <option value="polyfills">polyfills (Polyfills)</option>
+              <option value="machine-coding">machine-coding (Machine Coding)</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
+              SubCategory
             </label>
             <input
               type="text"
-              required
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g. JavaScript, React, CSS"
-              className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white placeholder-neutral-500 font-sans"
+              value={subCategory}
+              onChange={(e) => setSubCategory(e.target.value)}
+              placeholder="e.g. object(s), array(s), custom-hooks"
+              className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white placeholder-neutral-500 font-mono"
             />
           </div>
+        </div>
 
+        {/* Difficulty & Estimate */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
               Difficulty
@@ -153,50 +182,75 @@ export function QuestionForm({ initialData }: QuestionFormProps) {
               <option value="HARD">Hard</option>
             </select>
           </div>
-        </div>
 
-        {/* Estimate Minutes & Tags */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
-              Estimate Minutes
+              Estimate Minutes (Optional)
             </label>
             <input
               type="number"
-              required
               min={1}
-              value={estimateMinutes}
-              onChange={(e) => setEstimateMinutes(Number(e.target.value))}
+              value={estimateMinutes ?? ""}
+              onChange={(e) => setEstimateMinutes(e.target.value ? Number(e.target.value) : undefined)}
+              placeholder="e.g. 15"
               className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white font-mono"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
-              Concept Tags (Comma Separated)
-            </label>
-            <input
-              type="text"
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-              placeholder="e.g. arrays, recursion, maps"
-              className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white placeholder-neutral-500 font-mono"
             />
           </div>
         </div>
 
-        {/* Description / Content */}
+        {/* Tags */}
         <div className="space-y-2">
           <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
-            Problem Description
+            Concept Tags (Comma Separated)
+          </label>
+          <input
+            type="text"
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            placeholder="e.g. problem-solving, objects, immutability"
+            className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white placeholder-neutral-500 font-mono"
+          />
+        </div>
+
+        {/* Short Description */}
+        <div className="space-y-2">
+          <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
+            Short Description / Excerpt
           </label>
           <textarea
-            required
-            rows={8}
+            rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe the challenge clearly. Explain requirements, edge cases, and expected behaviors..."
+            placeholder="Brief excerpt shown in question cards and listings..."
             className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white placeholder-neutral-500 font-sans"
+          />
+        </div>
+
+        {/* Full Question Body (Markdown) */}
+        <div className="space-y-2">
+          <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
+            Question Body (Markdown)
+          </label>
+          <textarea
+            rows={8}
+            value={questionBody}
+            onChange={(e) => setQuestionBody(e.target.value)}
+            placeholder="Full problem statement in markdown format..."
+            className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white placeholder-neutral-500 font-mono"
+          />
+        </div>
+
+        {/* Full Solution Body (Markdown) */}
+        <div className="space-y-2">
+          <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 font-semibold">
+            Solution Body (Markdown)
+          </label>
+          <textarea
+            rows={8}
+            value={solutionBody}
+            onChange={(e) => setSolutionBody(e.target.value)}
+            placeholder="Approach, step-by-step reasoning, solution code, and time/space complexity analysis..."
+            className="focus-ring w-full rounded-md border border-base-700 bg-base-900 px-4 py-2.5 text-sm text-white placeholder-neutral-500 font-mono"
           />
         </div>
 
